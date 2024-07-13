@@ -16,6 +16,8 @@ function GetInventoryItemCountByName(name)
 			end
 		end
 	end
+
+	return count
 end
 
 function DecodeItemLink(link)
@@ -30,7 +32,7 @@ function DecodeItemLink(link)
 end
 
 function GetSoulShardCount()
-	return GetInventoryItemCountByName("Soul Shard")
+	return GetInventoryItemCountByName("Soul Shard") or 0
 end
 
 -------------------------------- UNIT --------------------------------
@@ -610,7 +612,7 @@ function WarlockDotSpam(unit, curse, shards)
 	local playerManaPercent = UnitManaPercent("player")
 
 	if targetGivesXp then
-		local soulShardCount = GetSoulShardCount()
+		local soulShardCount = GetSoulShardCount() or 0
 		local soulShardBagSize = 4
 		if not targetIsBoss and targetIsDying and not IsShadowburnActive(unit) and soulShardCount < soulShardBagSize then
 			CastDrainSoul(unit)
