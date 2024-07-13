@@ -247,7 +247,7 @@ function VoidwalkerAutoSacrifice(PlayerHealthPercent, PetHealthPercent)
 	return false
 end
 
-function PetAttack()
+function PetAttackIfNotPassive()
 	if UnitExists("pet") then
 		local _,_,_,_,isActive = GetPetActionInfo(10)
 		if not isActive and not GetUnitName("pettarget") then
