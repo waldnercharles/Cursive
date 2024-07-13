@@ -83,14 +83,15 @@ end
 Cursive:RegisterEvent("UNIT_CASTEVENT", function(casterGuid, targetGuid, event, spellID, castDuration)
 	-- immolate will fire both start and cast
 	if event == "CAST" then
-		local _, guid = UnitExists("player")
-		if casterGuid ~= guid then
-			return
-		end
-
-		if curses.trackedCurseIds[spellID] then
+		if UnitIsUnit(casterGuid, "player") and curses.trackedCurseIds[spellID] then
 			lastGuid = targetGuid
-			curses.ApplyCurse(spellID, targetGuid, GetTime())
+			curses:ApplyCurse(spellID, targetGuid, GetTime())
+		end
+	end
+
+	if event == "CAST" or event == "CHANNEL" or event == "MAINHAND" or event == "OFFHAND" then
+		if not UnitIsTapped(targetGuid) and UnitIsInParty(casterGuid) then
+			Cursive.core.tapped[targetGuid] = { casterGuid, event, spellID }
 		end
 	end
 end)
@@ -101,7 +102,7 @@ Cursive:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE",
 		local _, _, spell, target = string.find(message, resist_test)
 		if spell and target then
 			if curses.trackedCurseNamesToTextures[spell] and lastGuid then
-				curses.RemoveCurse(lastGuid, spell)
+				curses:RemoveCurse(lastGuid, spell)
 				-- check if sound should be played
 				if curses:ShouldPlayResistSound(lastGuid) then
 					PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")

@@ -75,6 +75,6 @@ function getWarlockSpells()
 		[1086] = { name = "Demon Armor", rank = 2, duration = 1800 },
 		[11733] = { name = "Demon Armor", rank = 3, duration = 1800 },
 		[11734] = { name = "Demon Armor", rank = 4, duration = 1800 },
-		[11735] = { name = "Demon Armor", rank = 5, duration = 1800 },
+		[11735] = { name = "Demon Armor", rank = 5, duration = 1800 }
 	}
 end

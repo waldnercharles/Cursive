@@ -11,7 +11,8 @@ AURAADDEDSELFHELPFUL = "You gain %s (1)."
 
 Cursive.core = CreateFrame("Frame", "Cursive", UIParent)
 Cursive.core.guids = {}
-Cursive.playerState = { casting = {}, channeling = {} }
+Cursive.core.tapped = {}
+Cursive.playerState = { casting = nil, channeling = nil }
 
 Cursive.core.add = function(unit)
 	local _, guid = UnitExists(unit)
@@ -33,6 +34,7 @@ end
 
 Cursive.core.remove = function(guid)
 	Cursive.core.guids[guid] = nil
+	Cursive.core.tapped[guid] = nil
 end
 
 Cursive.core.enable = function()
@@ -61,7 +63,7 @@ Cursive:RegisterEvent("SPELLCAST_START", function(arg1, arg2)
 	Cursive.playerState.casting = arg1
 end)
 
-Cursive:RegisterEvent("SPELLCAST_STOP", function(arg1)
+Cursive:RegisterEvent("SPELLCAST_STOP", function()
 	Cursive.playerState.casting = nil
 end)
 
@@ -72,3 +74,37 @@ end)
 Cursive:RegisterEvent("SPELLCAST_CHANNEL_STOP", function()
 	Cursive.playerState.channeling = nil
 end)
+
+function PairsByKeys (t, f)
+    local a = {}
+    for n in pairs(t) do table.insert(a, n) end
+    table.sort(a, f)
+    local i = 0      -- iterator variable
+    local iter = function ()   -- iterator function
+        i = i + 1
+        if a[i] == nil then return nil
+        else return a[i], t[a[i]]
+        end
+    end
+    return iter
+end
+
+function CompareGuids(guid1, guid2)
+	local guid1inRange = CheckInteractDistance(guid1, 4)
+	local guid2inRange = CheckInteractDistance(guid2, 4)
+
+	local guid1IsMulticurseTarget = UnitIsMulticurseTarget(guid1)
+	local guid2IsMulticurseTarget = UnitIsMulticurseTarget(guid2)
+
+	if guid1inRange and not guid2inRange then
+		return true
+	elseif guid2inRange and not guid1inRange then
+		return false
+	elseif guid1IsMulticurseTarget and not guid2IsMulticurseTarget then
+		return true
+	elseif guid2IsMulticurseTarget and not guid1IsMulticurseTarget then
+		return false
+	else
+		return UnitHealth(guid1) > UnitHealth(guid2)
+	end
+end

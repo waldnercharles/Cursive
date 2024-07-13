@@ -24,6 +24,10 @@
     "SetRaidTargetIconTexture",
     "GetDifficultyColor",
     "BOOKTYPE_SPELL",
-    "NUM_BAG_FRAMES"
+    "NUM_BAG_FRAMES",
+    "toString",
+    "FCF_SelectDockFrame",
+    "NUM_PET_ACTION_SLOTS",
+    "class"
   ]
 }

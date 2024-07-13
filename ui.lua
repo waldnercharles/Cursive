@@ -379,9 +379,9 @@ ui:SetScript("OnUpdate", function()
 	local col = 1
 	local maxBarsDisplayed = false
 
-	for guid, time in pairs(Cursive.core.guids) do
+	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids) do
 		-- apply filters
-		local shouldDisplay = Cursive:ShouldDisplayGuid(guid)
+		local shouldDisplay = UnitIsMulticurseTarget(guid) --Cursive:ShouldDisplayGuid(guid)
 		-- display element if filters allow it
 		if shouldDisplay and not maxBarsDisplayed then
 			-- display guid
