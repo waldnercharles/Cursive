@@ -71,45 +71,9 @@ function UnitGivesXP(unit)
 		not UnitIsPet(unit)
 end
 
-function UnitHasBuff(unit, spellName, spellId)
-	for i = 1, 32 do
-		local buffName, _, buffId = UnitBuff(unit, i)
-		if buffId and spellId then
-			if buffId == spellId then
-				return true
-			end
-		elseif buffName and spellName then
-			if buffName == spellName then
-				return true
-			end
-		else
-			break
-		end
-	end
-
-	return nil
-end
-
-function UnitHasDebuff(unit, spellName, spellId)
-	for i = 1, 16 do
-		local debuffName, _, _, debuffId = UnitDebuff(unit, i)
-		if debuffId and spellId then
-			if debuffId == spellId then
-				return true
-			end
-		elseif debuffName and spellName then
-			if debuffName == spellName then
-				return true
-			end
-		else
-			break
-		end
-	end
-end
-
-function UnitHasBuffOrDebuff(unit, spellName, spellId)
+function UnitHasBuffOrDebuff(unit, spellName, timeRemaining)
 	local _, guid = UnitExists(unit)
-	return UnitHasBuff(guid, spellName, spellId) or UnitHasDebuff(guid, spellName, spellId)
+	return Cursive.curses:HasCurse(spellName, guid, timeRemaining)
 end
 
 function UnitHasAnyCurse(unit)
@@ -243,7 +207,7 @@ end
 function VoidwalkerAutoSacrifice(PlayerHealthPercent, PetHealthPercent)
 	local PlayerHP = PlayerHealthPercent or 30
 	local PetHP = PetHealthPercent or 20
-	if UnitAffectingCombat("player") and UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 and UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasDebuff("pet", "Banish") then
+	if UnitAffectingCombat("player") and UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 and UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasBuffOrDebuff("pet", "Banish") then
 		return CastPetSpell("Sacrifice")
 	end
 	return false
