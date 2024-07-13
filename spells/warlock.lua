@@ -65,5 +65,16 @@ function getWarlockSpells()
 		[5782] = { name = "Fear", rank = 1, duration = 10 },
 		[6213] = { name = "Fear", rank = 2, duration = 15 },
 		[6215] = { name = "Fear", rank = 3, duration = 20 },
+
+		[17941] = { name = "Shadow Trance", rank = 1, duration = 10 },
+		[18094] = { name = "Nightfall", rank = 1, duration = 10 },
+		[18095] = { name = "Nightfall", rank = 2, duration = 10 },
+
+		[696] = { name = "Demon Skin", rank = 1, duration = 1800 },
+		[706] = { name = "Demon Armor", rank = 1, duration = 1800 },
+		[1086] = { name = "Demon Armor", rank = 2, duration = 1800 },
+		[11733] = { name = "Demon Armor", rank = 3, duration = 1800 },
+		[11734] = { name = "Demon Armor", rank = 4, duration = 1800 },
+		[11735] = { name = "Demon Armor", rank = 5, duration = 1800 },
 	}
 end

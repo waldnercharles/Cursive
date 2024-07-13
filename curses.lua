@@ -13,7 +13,7 @@ local curses = {
 
 -- combat events for curses
 local afflict_test = "^(.+) is afflicted by (.+) %((%d+)%)" -- for stacks 2-5 will be "Fire Vulnerability (2)".
-local gains_test = "^(.+) gains (.+) %((%d+)%)" -- for stacks 2-5 will be "Fire Vulnerability (2)".
+local gains_test = "^(.+) gains (.+) %((%d+)%)"             -- for stacks 2-5 will be "Fire Vulnerability (2)".
 local fades_test = "(.+) fades from (.+)"
 local resist_test = "Your (.+) was resisted by (.+)"
 
@@ -46,21 +46,30 @@ function curses:LoadCurses()
 	end
 end
 
-function curses:ScanGuidForCurse(guid, curseSpellID)
+function curses:ScanGuidForCurse(guid, curseSpellID, curseSpellName)
 	for i = 1, 16 do
-		local _, _, _, spellID = UnitDebuff(guid, i)
-		if spellID then
+		local spellName, _, _, spellID = UnitDebuff(guid, i)
+		if spellID and curseSpellID then
 			if spellID == curseSpellID then
+				return true
+			end
+		elseif spellName and curseSpellName then
+			if spellName == curseSpellName then
 				return true
 			end
 		else
 			break
 		end
 	end
+
 	for i = 1, 32 do
-		local _, _, spellID = UnitBuff(guid, i)
-		if spellID then
+		local spellName, _, spellID = UnitBuff(guid, i)
+		if spellID and curseSpellID then
 			if spellID == curseSpellID then
+				return true
+			end
+		elseif spellName and curseSpellName then
+			if spellName == curseSpellName then
 				return true
 			end
 		else
@@ -81,25 +90,25 @@ Cursive:RegisterEvent("UNIT_CASTEVENT", function(casterGuid, targetGuid, event, 
 
 		if curses.trackedCurseIds[spellID] then
 			lastGuid = targetGuid
-			Cursive:ScheduleEvent("addCurse" .. targetGuid .. curses.trackedCurseIds[spellID].name, curses.ApplyCurse, 0.2, self, spellID, targetGuid, GetTime())
+			curses.ApplyCurse(spellID, targetGuid, GetTime())
 		end
 	end
 end)
 
 Cursive:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE",
-		function(message)
-			-- check for resist
-			local _, _, spell, target = string.find(message, resist_test)
-			if spell and target then
-				if curses.trackedCurseNamesToTextures[spell] and lastGuid then
-					Cursive:CancelScheduledEvent("addCurse" .. lastGuid .. spell)
-					-- check if sound should be played
-					if curses:ShouldPlayResistSound(lastGuid) then
-						PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")
-					end
+	function(message)
+		-- check for resist
+		local _, _, spell, target = string.find(message, resist_test)
+		if spell and target then
+			if curses.trackedCurseNamesToTextures[spell] and lastGuid then
+				curses.RemoveCurse(lastGuid, spell)
+				-- check if sound should be played
+				if curses:ShouldPlayResistSound(lastGuid) then
+					PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")
 				end
 			end
 		end
+	end
 ) -- resists
 
 Cursive:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_OTHER", function(message)

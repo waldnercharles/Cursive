@@ -11,6 +11,7 @@ AURAADDEDSELFHELPFUL = "You gain %s (1)."
 
 Cursive.core = CreateFrame("Frame", "Cursive", UIParent)
 Cursive.core.guids = {}
+Cursive.playerState = { casting = {}, channeling = {} }
 
 Cursive.core.add = function(unit)
 	local _, guid = UnitExists(unit)
@@ -54,4 +55,20 @@ Cursive.core:SetScript("OnEvent", function()
 		-- arg1 is guid
 		this.addGuid(arg1)
 	end
+end)
+
+Cursive:RegisterEvent("SPELLCAST_START", function(arg1, arg2)
+	Cursive.playerState.casting = arg1
+end)
+
+Cursive:RegisterEvent("SPELLCAST_STOP", function(arg1)
+	Cursive.playerState.casting = nil
+end)
+
+Cursive:RegisterEvent("SPELLCAST_CHANNEL_START", function(arg1, arg2)
+	Cursive.playerState.channeling = arg2
+end)
+
+Cursive:RegisterEvent("SPELLCAST_CHANNEL_STOP", function()
+	Cursive.playerState.channeling = nil
 end)
