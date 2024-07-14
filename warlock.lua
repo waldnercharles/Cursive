@@ -8,7 +8,8 @@ function GetInventoryItemCountByName(name)
 			local bagSlots = GetContainerNumSlots(b)
 			for s = 1, bagSlots do
 				local itemLink = GetContainerItemLink(b, s)
-				local n, _ = DecodeItemLink(itemLink)
+				local n = DecodeItemLink(itemLink)
+				n = n and string.lower(n)
 				if name == n then
 					local _, c = GetContainerItemInfo(b, s)
 					count = count + c
@@ -22,11 +23,8 @@ end
 
 function DecodeItemLink(link)
 	if link then
-		local found, _, id, name = string.find(link, "item:(%d+):.*%[(.*)%]")
-		if found then
-			id = tonumber(id)
-			return name, id
-		end
+		local found, _, name = string.find(link, "%[(.*)%]")
+		return name
 	end
 	return nil
 end
