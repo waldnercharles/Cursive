@@ -12,7 +12,7 @@ AURAADDEDSELFHELPFUL = "You gain %s (1)."
 Cursive.core = CreateFrame("Frame", "Cursive", UIParent)
 Cursive.core.guids = {}
 Cursive.core.tapped = {}
-Cursive.playerState = { casting = nil, channeling = nil }
+Cursive.playerState = { casting = nil, channeling = nil, x = nil, y = nil, moving = nil }
 
 Cursive.core.add = function(unit)
 	local _, guid = UnitExists(unit)
@@ -59,20 +59,15 @@ Cursive.core:SetScript("OnEvent", function()
 	end
 end)
 
-Cursive:RegisterEvent("SPELLCAST_START", function(arg1, arg2)
-	Cursive.playerState.casting = arg1
-end)
-
-Cursive:RegisterEvent("SPELLCAST_STOP", function()
-	Cursive.playerState.casting = nil
-end)
-
-Cursive:RegisterEvent("SPELLCAST_CHANNEL_START", function(arg1, arg2)
-	Cursive.playerState.channeling = arg2
-end)
-
-Cursive:RegisterEvent("SPELLCAST_CHANNEL_STOP", function()
-	Cursive.playerState.channeling = nil
+Cursive.core:SetScript("OnUpdate", function()
+	local x, y = UnitPosition("player")
+	if x == Cursive.playerState.x and y == Cursive.playerState.y then
+		Cursive.playerState.moving = nil
+	else
+		Cursive.playerState.x = x
+		Cursive.playerState.y = y
+		Cursive.playerState.moving = true
+	end
 end)
 
 function PairsByKeys (t, f)

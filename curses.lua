@@ -47,14 +47,16 @@ function curses:LoadCurses()
 end
 
 function curses:ScanGuidForCurse(guid, curseSpellID, curseSpellName)
+	local texture = curses.trackedCurseNamesToTextures[curseSpellName]
+
 	for i = 1, 16 do
 		local spellName, _, _, spellID = UnitDebuff(guid, i)
 		if spellID and curseSpellID then
 			if spellID == curseSpellID then
 				return true
 			end
-		elseif spellName and curseSpellName then
-			if spellName == curseSpellName then
+		elseif spellName and texture then
+			if spellName == texture then
 				return true
 			end
 		else
@@ -68,8 +70,8 @@ function curses:ScanGuidForCurse(guid, curseSpellID, curseSpellName)
 			if spellID == curseSpellID then
 				return true
 			end
-		elseif spellName and curseSpellName then
-			if spellName == curseSpellName then
+		elseif spellName and texture then
+			if spellName == texture then
 				return true
 			end
 		else
@@ -89,6 +91,18 @@ Cursive:RegisterEvent("UNIT_CASTEVENT", function(casterGuid, targetGuid, event, 
 		end
 	end
 
+	if UnitIsUnit(casterGuid, "player") then
+		local spellName = SpellInfo(spellID)
+		if event == "START" then
+			Cursive.playerState.casting = spellName
+		elseif event == "CHANNEL" then
+			Cursive.playerState.channeling = spellName
+		elseif event == "CAST" or event == "CHANNEL" or event == "FAIL" then
+			Cursive.playerState.casting = nil
+			Cursive.playerState.channeling = nil
+		end
+	end
+
 	if event == "CAST" or event == "CHANNEL" or event == "MAINHAND" or event == "OFFHAND" then
 		if not UnitIsTapped(targetGuid) and UnitIsInParty(casterGuid) then
 			Cursive.core.tapped[targetGuid] = { casterGuid, event, spellID }
@@ -101,7 +115,7 @@ Cursive:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE",
 		-- check for resist
 		local _, _, spell, target = string.find(message, resist_test)
 		if spell and target then
-			if curses.trackedCurseNamesToTextures[spell] and lastGuid then
+			if curses.trackedCurseNamesToTextures[spell] and lastGuid and not curses:ScanGuidForCurse(lastGuid, nil, spell) then
 				curses:RemoveCurse(lastGuid, spell)
 				-- check if sound should be played
 				if curses:ShouldPlayResistSound(lastGuid) then

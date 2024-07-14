@@ -126,7 +126,8 @@ end
 
 -------------------------------- PET --------------------------------
 
-function CastPetSpell(SpellName, ManaNoRanks, ManaPercent, ManaSpellRank1, ManaSpellRank2, ManaSpellRank3, ManaSpellRank4, ManaSpellRank5, ManaSpellRank6, ManaSpellRank7, ManaSpellRank8, ManaSpellRank9)
+function CastPetSpell(SpellName, unit, ManaNoRanks, ManaPercent, ManaSpellRank1, ManaSpellRank2, ManaSpellRank3, ManaSpellRank4, ManaSpellRank5, ManaSpellRank6, ManaSpellRank7, ManaSpellRank8, ManaSpellRank9)
+	unit = unit or "target"
 	local m = nil
 	if not (UnitHealth("pet") > 0) then
 		--print("Your pet is not active or alive to use pet ability: "..SpellName)
@@ -196,7 +197,7 @@ function CastPetSpell(SpellName, ManaNoRanks, ManaPercent, ManaSpellRank1, ManaS
 				--print("The pet ability "..SpellName.." is active, unable to cast")
 				return false
 			end
-			CastPetAction(i)
+			CastPetAction(i, unit)
 			return true
 		end
 	end
@@ -216,7 +217,7 @@ end
 function PetAttackIfNotPassive()
 	if UnitExists("pet") then
 		local _,_,_,_,isActive = GetPetActionInfo(10)
-		if not isActive and not GetUnitName("pettarget") then
+		if not isActive then
 			PetAttack()
 		end
 	end
@@ -349,18 +350,22 @@ function IsSpellKnown(spell, rank, book)
 end
 
 function IsMoving()
-	return false
+	return Cursive.playerState.moving
 end
 
 -------------------------------- WARLOCK --------------------------------
 
-function Cast(spell, unit, refreshTime, stopCast)
+function Cast(spell, unit, selfCast, refreshTime, stopCast)
 	if not IsSpellKnown(spell) then
 		return false
 	end
 
 	local _ = nil
 	_, unit = UnitExists(unit or "target")
+
+	if not unit or UnitIsDead(unit) then
+		_, unit = UnitExists("player")
+	end
 
 	if not IsValidTarget(unit, spell, refreshTime) then
 		return false
@@ -370,7 +375,7 @@ function Cast(spell, unit, refreshTime, stopCast)
 		SpellStopCasting()
 	end
 
-	CastSpellByName(spell, unit)
+	CastSpellByName(spell, unit, selfCast)
 	return true
 end
 
@@ -453,11 +458,11 @@ function CastShadowBolt(unit)
 end
 
 function CastShadowburn(unit, stopCast)
-	return Cast("Shadowburn", unit, nil, stopCast)
+	return Cast("Shadowburn", unit, nil, nil, stopCast)
 end
 
 function CastImmolate(unit)
-	return not IsMoving() and Cast("Immolate", unit, 2)
+	return not IsMoving() and Cast("Immolate", unit, nil, 2)
 end
 
 function CastCorruption(unit)
@@ -473,7 +478,19 @@ function CastSiphonLife(unit)
 end
 
 function CastDemonArmor()
-	return Cast("Demon Armor") or Cast("Demon Skin")
+	local i, x = 1, 0
+	while UnitBuff("player",i) do
+		if UnitBuff("player",i) == "Interface\\Icons\\Spell_Shadow_RagingScream" then
+			return nil
+		end
+		i = i + 1
+	end
+
+	return (IsSpellKnown("Demon Armor") and Cast("Demon Armor", nil, true)) or (IsSpellKnown("Demon Skin") and Cast("Demon Skin", nil, true))
+end
+
+function CastDemonArmorOrDarkPactAndLifeTap(tapFirstPlayerHealthPercent, pactFirstPetManaPercent)
+	return CastDemonArmor() or CastDarkPactAndLifeTap(tapFirstPlayerHealthPercent, pactFirstPetManaPercent)
 end
 
 function CastAutoTap()
@@ -519,7 +536,7 @@ function CastDarkPact()
 			if (UnitMana("pet") >= m[i] ) then
 				if IsSpellKnown("Dark Pact", i) then
 					if IsOffCooldown("Dark Pact") then
-						Cast("Dark Pact (Rank "..i..")")
+						Cast("Dark Pact (Rank "..i..")", nil, true)
 						return true
 					end
 					break
@@ -531,12 +548,12 @@ function CastDarkPact()
 end
 
 function CastLifeTap()
-	return UnitManaMax("player") ~= UnitMana("player") and IsSpellKnown("Life Tap") and IsOffCooldown("Life Tap") and Cast("Life Tap")
+	return UnitManaMax("player") ~= UnitMana("player") and IsSpellKnown("Life Tap") and IsOffCooldown("Life Tap") and Cast("Life Tap", nil, true)
 end
 
 -------------------------------- MAIN --------------------------------
 
-function WarlockDotSpam(unit, curse, shards)
+function WarlockDotSpam(unit, curse, shards, nodrain)
 	if curse == 0 then
 		curse = nil
 	end
@@ -608,7 +625,7 @@ function WarlockDotSpam(unit, curse, shards)
 		end
 	end
 
-	if (IsCasting("Immolate") and (UnitHasBuffOrDebuff(unit, "Immolate") or targetIsDying)) or (IsCasting("Corruption") and (UnitHasBuffOrDebuff(unit, "Corruption") or targetIsDying)) then
+	if (IsCasting("Immolate") and (UnitHasBuffOrDebuff(unit, "Immolate", 2) or targetIsDying)) or (IsCasting("Corruption") and (UnitHasBuffOrDebuff(unit, "Corruption") or targetIsDying)) then
 		SpellStopCasting()
 	end
 
@@ -635,10 +652,10 @@ function WarlockDotSpam(unit, curse, shards)
 	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastAutoTap() then
 		return true
 		-- Immolate
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and (not IsSpellKnown("Drain Life") or (not (playerHealthPercent <= 0.8 or isDrainLifeInRange))) and CastImmolate(unit) then
+	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and (nodrain or not IsSpellKnown("Drain Life") or (not (playerHealthPercent <= 0.8 or isDrainLifeInRange))) and CastImmolate(unit) then
 		return true
 		-- Drain Life
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastDrainLife(unit) then
+	elseif not nodrain and (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastDrainLife(unit) then
 		return true
 	end
 
@@ -649,12 +666,33 @@ function UnitIsMulticurseTarget(guid)
 	return UnitExists(guid) and not UnitIsDead(guid) and UnitIsEnemy(guid) and (UnitIsTargetingParty(guid) or Cursive.core.tapped[guid] or UnitIsUnit("target", guid))
 end
 
-function MulticurseWarlockDotSpam(curse, shards)
+function MulticurseWarlockDotSpam(curse, shards, nodrain)
 	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids) do
-		if UnitIsMulticurseTarget(guid) and WarlockDotSpam(guid, curse, shards) then
+		if UnitIsMulticurseTarget(guid) and WarlockDotSpam(guid, curse, shards, nodrain) then
 			return true
 		end
 	end
 
 	return nil
+end
+
+function PetTank()
+	local orderFunction = function(guid1, guid2)
+		local guid1IsTargetingPlayer = UnitIsUnit("player", guid1.."target")
+		local guid2IsTargetingPlayer = UnitIsUnit("player", guid2.."target")
+
+		if guid1IsTargetingPlayer and not guid2IsTargetingPlayer then
+			return true
+		elseif not guid1IsTargetingPlayer and guid2IsTargetingPlayer then
+			return false
+		end
+	end
+
+	for guid, time in PairsByKeys(Cursive.core.guids, orderFunction) do
+		PetAttackIfNotPassive()
+		if UnitCreatureFamily("pet") == "Voidwalker" and UnitIsUnit("player", guid.."target") then
+			CastPetSpell("Torment", guid)
+		end
+		return
+	end
 end
