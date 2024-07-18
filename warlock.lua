@@ -206,16 +206,18 @@ end
 function VoidwalkerAutoSacrifice(PlayerHealthPercent, PetHealthPercent)
 	local PlayerHP = PlayerHealthPercent or 30
 	local PetHP = PetHealthPercent or 20
-	if UnitAffectingCombat("player") and UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 and UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasBuffOrDebuff("pet", "Banish") then
+	if UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 or UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasBuffOrDebuff("pet", "Banish") then
 		return CastPetSpell("Sacrifice")
 	end
 	return false
 end
 
-function PetAttackIfNotPassive()
-	if UnitExists("pet") then
+function PetAttackIfNotPassive(unit)
+	unit = unit or "target"
+	if UnitExists("pet") and UnitExists(unit) then
 		local _,_,_,_,isActive = GetPetActionInfo(10)
 		if not isActive then
+			TargetUnit(unit)
 			PetAttack()
 		end
 	end
@@ -262,73 +264,8 @@ function IsAmplifyCurseActive()
 	return UnitHasBuffOrDebuff("player", "Amplify Curse")
 end
 
-function GetSpellId(spell, rank, book)
-	local B = book or BOOKTYPE_SPELL
-	local SpellID = nil
-	if spell then
-		local SpellCount = 0
-		local ReturnName = nil
-		local ReturnRank = nil
-		while spell ~= ReturnName do
-			SpellCount = SpellCount + 1
-			ReturnName, ReturnRank = GetSpellName(SpellCount, B)
-			if not ReturnName then
-				break
-			end
-		end
-		while spell == ReturnName do
-			if rank then
-				if rank == 0 then
-					return SpellCount
-				elseif ReturnRank and ReturnRank ~= "" then
-					local found, _, Rank = string.find(ReturnRank, "(%d+)")
-					if found then
-						ReturnRank = tonumber(Rank)
-					else
-						ReturnRank = 1
-					end
-				else
-					ReturnRank = 1
-				end
-				if rank == ReturnRank then
-					return SpellCount
-				end
-			else
-				SpellID = SpellCount
-			end
-			SpellCount = SpellCount + 1
-			ReturnName, ReturnRank = GetSpellName(SpellCount, B)
-		end
-	end
-	return SpellID
-end
-
-function GetSpellRankByName(SpellName, Book)
-	local B = Book or BOOKTYPE_SPELL
-	local rslt = 0
-	if SpellName then
-		local spell, rank
-		local i = GetSpellId(SpellName, nil, B)
-		if i then
-			spell, rank = GetSpellName(i, B)
-			rslt = rank
-			if rslt and rslt ~= "" then
-				local found, _, Rank = string.find(rslt, "(%d+)")
-				if found then
-					rslt = tonumber(Rank)
-				else
-					rslt = 1
-				end
-			else
-				rslt = 1
-			end
-		end
-	end
-	return rslt
-end
-
 function IsOffCooldown(spell, book)
-	local spellIndex = GetSpellId(spell, 0, book)
+	local spellIndex = Cursive_GetSpellId(spell, 0, book)
 
 	local b = book or BOOKTYPE_SPELL
 	if spellIndex then
@@ -341,9 +278,9 @@ end
 
 function IsSpellKnown(spell, rank, book)
 	if rank then
-		return GetSpellId(spell, rank, book) and true or false
+		return Cursive_GetSpellId(spell, rank, book) and true or false
 	else
-		return GetSpellId(spell, 0, book) and true or false
+		return Cursive_GetSpellId(spell, 0, book) and true or false
 	end
 end
 
@@ -371,6 +308,11 @@ function Cast(spell, unit, selfCast, refreshTime, stopCast)
 
 	if stopCast then
 		SpellStopCasting()
+	end
+
+	local action = Cursive_Button[spell]
+	if action and not (IsUsableAction(action) and IsActionInRange(action)) then
+		return nil
 	end
 
 	CastSpellByName(spell, unit, selfCast)
@@ -505,7 +447,7 @@ function CastAutoTap()
 	if not IsCastingOrChanneling() and not (c and m / mm >= 0.5) then
 		if d and mm - m >= 150 and (p == pm or (p / pm >= 0.99 and (h < hm or not l))) and CastDarkPact() then
 			return true
-		elseif ((h / hm) - (m / mm)) > 0.2 and h / hm > 0.66 and CastLifeTap() then
+		elseif (m / mm >= 0.8 and h / hm >= 0.98) or (m / mm < 0.8 and h / hm >= 0.95) and CastLifeTap() then
 			return true
 		end
 	end
@@ -615,33 +557,28 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		return true
 	end
 
-	if not playerIsCastingOrChanneling and not targetIsActive then
-		if CastAutoTap() then
-			return true
-		elseif playerManaPercent >= 0.5 and CastDemonArmor() then
-			return true
-		end
-	end
-
 	if (IsCasting("Immolate") and (UnitHasBuffOrDebuff(unit, "Immolate", 2) or targetIsDying)) or (IsCasting("Corruption") and (UnitHasBuffOrDebuff(unit, "Corruption") or targetIsDying)) then
 		SpellStopCasting()
 	end
 
 	-- Main Rotation -- Assumes the player has Nightfall and Fel Concentration
 
-	local isDrainLifeInRange = false
+	local isDrainLifeInRange = Cursive_Button["Drain Life"]  and IsActionInRange(Cursive_Button["Drain Life"])
 
 	local preferDrainLife = targetIsTargetingPlayer and
 		(playerHealthPercent <= 0.8 and playerManaPercent <= 0.2 and isDrainLifeInRange)
 
-	-- Corruption
-	if (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and CastCorruption(unit) then
+	-- Curse of Recklessness
+	if (targetIsDying and not targetIsBoss) and not UnitExists(unit.."target") and CastCurse(unit, "cor") then
 		return true
-		-- DPS Amplify Curse
+	-- Corruption
+	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and CastCorruption(unit) then
+		return true
+	-- 	-- DPS Amplify Curse
 	-- elseif (playerHasAmplifyCurse or (not curse and (not targetIsDying or targetIsBoss) and not UnitHasAnyCurse(unit) and not playerIsCastingOrChanneling)) and ((not targetIsDying and targetIsBoss and not playerHasAmplifyCurse and CastCoD(unit)) or CastCoA(unit)) then
-	-- 	return true
+	--  	return true
 		-- Regular Curse
-	elseif playerHasAmplifyCurse or ((not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not UnitHasAnyCurse(unit)) and CastCurse(unit, curse) then
+	elseif (playerHasAmplifyCurse or ((not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not UnitHasAnyCurse(unit))) and CastCurse(unit, curse) then
 		return true
 		-- Siphon Life
 	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastSiphonLife(unit) then
@@ -657,6 +594,14 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		return true
 	end
 
+	if not playerIsCastingOrChanneling and not targetIsActive then
+		if CastAutoTap() then
+			return true
+		elseif playerManaPercent >= 0.5 and CastDemonArmor() then
+			return true
+		end
+	end
+
 	return nil
 end
 
@@ -667,6 +612,7 @@ end
 function MulticurseWarlockDotSpam(curse, shards, nodrain)
 	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids) do
 		if UnitIsMulticurseTarget(guid) and WarlockDotSpam(guid, curse, shards, nodrain) then
+			TargetUnit(guid)
 			return true
 		end
 	end
@@ -674,23 +620,65 @@ function MulticurseWarlockDotSpam(curse, shards, nodrain)
 	return nil
 end
 
+function IsSquishy(unit)
+	if not UnitExists(unit) then
+		return -1
+	end
+
+	local c = {
+		["WARRIOR"] = 0,
+		["PALADIN"] = 0,
+		["HUNTER"] = 1,
+		["ROGUE"] = 1,
+		["PRIEST"] = 2,
+		["SHAMAN"] = 1,
+		["MAGE"] = 2,
+		["WARLOCK"] = 2,
+		["DRUID"] = 0, -- TODO: Check for talent spec?
+	}
+
+	local _, class = UnitClass(unit)
+	return c[class]
+end
+
 function PetTank()
 	local orderFunction = function(guid1, guid2)
-		local guid1IsTargetingPlayer = UnitIsUnit("player", guid1.."target")
-		local guid2IsTargetingPlayer = UnitIsUnit("player", guid2.."target")
+		local guid1Squishy = IsSquishy(guid1.."target")
+		local guid2Squishy = IsSquishy(guid2.."target")
 
-		if guid1IsTargetingPlayer and not guid2IsTargetingPlayer then
-			return true
-		elseif not guid1IsTargetingPlayer and guid2IsTargetingPlayer then
+		if guid1Squishy > guid2Squishy then
+			if CompareGuids(guid1, guid2) then
+				return true
+			elseif guid2Squishy > guid1Squishy then
+				return false
+			end
+		else
 			return false
 		end
 	end
 
 	for guid, time in PairsByKeys(Cursive.core.guids, orderFunction) do
-		PetAttackIfNotPassive()
-		if UnitCreatureFamily("pet") == "Voidwalker" and UnitIsUnit("player", guid.."target") then
-			CastPetSpell("Torment", guid)
+		if UnitExists(guid.."target") and IsSquishy(guid.."target") > 0 and UnitIsMulticurseTarget(guid) and CheckInteractDistance(guid, 4) then
+			PetAttackIfNotPassive(guid)
+			if UnitCreatureFamily("pet") == "Voidwalker" and UnitIsUnit("player", guid.."target") then
+				CastPetSpell("Torment", guid)
+			end
+		elseif not UnitExists("pettarget") and UnitExists("target") then
+			PetAttackIfNotPassive("target")
 		end
 		return
+	end
+end
+
+function Shoot(unit)
+	unit = unit or "target"
+	if not UnitExists(unit) then
+		return nil
+	end
+
+	if Cursive.playerState.autoRepeating then
+		return
+	else
+		CastSpellByName("Shoot", unit)
 	end
 end
