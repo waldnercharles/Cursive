@@ -14,9 +14,13 @@ Cursive.core.guids = {}
 Cursive.core.tapped = {}
 Cursive.playerState = { casting = nil, channeling = nil, attacking = nil, autoRepeating = nil, x = nil, y = nil, moving = nil }
 
-Cursive.registerButtonsTooltip = CreateFrame("GameTooltip", "RegisterButtonsTooltip", UIParent, "GameTooltipTemplate")
+Cursive.registerButtonsTooltip = CreateFrame("GameTooltip", "Cursive_RegisterButtonsTooltip", UIParent, "GameTooltipTemplate")
 Cursive.registerButtonsTooltip:Hide()
 Cursive.registerButtonsTooltip:SetOwner(Cursive.core, "ANCHOR_NONE")
+
+Cursive.buffTooltip = CreateFrame("GameTooltip", "Cursive_BuffTooltip", UIParent, "GameTooltipTemplate")
+Cursive.buffTooltip:Hide()
+Cursive.buffTooltip:SetOwner(Cursive.core, "ANCHOR_NONE")
 
 Cursive.core.add = function(unit)
 	local _, guid = UnitExists(unit)
@@ -77,6 +81,8 @@ Cursive.core:SetScript("OnUpdate", function()
 		Cursive.playerState.x = x
 		Cursive.playerState.y = y
 		Cursive.playerState.moving = true
+		Cursive.playerState.casting = nil
+		Cursive.playerState.channeling = nil
 	end
 end)
 
@@ -94,23 +100,41 @@ function PairsByKeys (t, f)
     return iter
 end
 
-function CompareGuids(guid1, guid2)
-	local guid1inRange = CheckInteractDistance(guid1, 4)
-	local guid2inRange = CheckInteractDistance(guid2, 4)
+function CompareGuids(priority, raidMark)
+	priority = priority or "HIGHEST_HP"
+	local compareHealth = function (priority, guid1, guid2)
+		if UnitHealth(guid1) == UnitHealth(guid2) then
+			return nil
+		end
 
-	local guid1IsMulticurseTarget = UnitIsMulticurseTarget(guid1)
-	local guid2IsMulticurseTarget = UnitIsMulticurseTarget(guid2)
+		if priority == "LOWEST_HP" then
+			return UnitHealth(guid1) < UnitHealth(guid2)
+		else
+			return UnitHealth(guid1) > UnitHealth(guid2)
+		end
+	end
+	
+	return function (guid1, guid2)
+		local guid1IsMulticurseTarget = UnitIsMulticurseTarget(guid1)
+		local guid2IsMulticurseTarget = UnitIsMulticurseTarget(guid2)
+		local guid1RaidPriority = GetRaidTargetIndex(guid1) or 0
+		local guid2RaidPriority = GetRaidTargetIndex(guid2) or 0
 
-	if guid1inRange and not guid2inRange then
-		return true
-	elseif guid2inRange and not guid1inRange then
-		return false
-	elseif guid1IsMulticurseTarget and not guid2IsMulticurseTarget then
-		return true
-	elseif guid2IsMulticurseTarget and not guid1IsMulticurseTarget then
-		return false
-	else
-		return UnitHealth(guid1) > UnitHealth(guid2)
+		if guid1IsMulticurseTarget and not guid2IsMulticurseTarget then
+			return true
+		elseif guid2IsMulticurseTarget and not guid1IsMulticurseTarget then
+			return false
+		else
+			if raidMark then
+				if guid1RaidPriority == guid2RaidPriority then
+					return compareHealth(priority, guid1, guid2)
+				else
+					return guid1RaidPriority > guid2RaidPriority
+				end
+			else
+				return compareHealth(priority, guid1, guid2)
+			end
+		end
 	end
 end
 
@@ -192,45 +216,13 @@ function Cursive_GetSpellRank(SpellName, Book)
 	return rslt
 end
 
-local function toCsv(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-	local s = ""
-	if arg1 then s = s..", "..tostring(arg1) end
-	if arg2 then s = s..", "..tostring(arg2) end
-	if arg3 then s = s..", "..tostring(arg3) end
-	if arg4 then s = s..", "..tostring(arg4) end
-	if arg5 then s = s..", "..tostring(arg5) end
-	if arg6 then s = s..", "..tostring(arg6) end
-	if arg7 then s = s..", "..tostring(arg7) end
-	if arg8 then s = s..", "..tostring(arg8) end
-	if arg9 then s = s..", "..tostring(arg9) end
-
-	return s
-end
-
 Cursive_Button = {}
-Cursive_Button_MaxRank = {}
 function RegisterButtons()
 	Cursive_Button = {}
-	Cursive_Button_MaxRank = {}
 	for i = 1, 120 do
 		local SpellName, SpellRank, RankName, text = GetActionButtonToolTipFirstLineInfo(i)
-		if text then
-			if not Cursive_Button["Macro."..text] then
-				Cursive_Button["Macro."..text] = i
-			end
-		elseif SpellName and not Cursive_Button[SpellName.."."..SpellRank] then
-			if not Cursive_Button_MaxRank[SpellName] then
-				Cursive_Button_MaxRank[SpellName] = Cursive_GetSpellRank(SpellName)
-			end
-			if Cursive_Button_MaxRank[SpellName] > 0 then
-				Cursive_Button[SpellName.."."..SpellRank] = i
-				if not Cursive_Button[SpellName] and SpellRank == Cursive_Button_MaxRank[SpellName] then
-					Cursive_Button[SpellName] = i
-				end
-				if not Cursive_Button[SpellName..".Any"] then
-					Cursive_Button[SpellName..".Any"] = i
-				end
-			end
+		if SpellName then
+			Cursive_Button[SpellName] = i
 		end
 	end
 end

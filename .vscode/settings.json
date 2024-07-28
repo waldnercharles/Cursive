@@ -62,6 +62,8 @@
     "StackSplitFrame",
     "SILVER_PER_GOLD",
     "GameTooltipTextLeft1",
-    "show"
+    "show",
+    "CHANNEL",
+    "nop"
   ]
 }

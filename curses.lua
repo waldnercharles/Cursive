@@ -82,6 +82,17 @@ function curses:ScanGuidForCurse(guid, curseSpellID, curseSpellName)
 	return nil
 end
 
+Cursive:RegisterEvent("SPELLCAST_CHANNEL_STOP", function ()
+	Cursive.playerState.channeling = nil
+end)
+
+Cursive:RegisterEvent("SPELLCAST_CHANNEL_UPDATE", function(arg1)
+	local timeLeft = tonumber(arg1)
+	  print(arg1)
+	if not timeLeft or timeLeft <= 0 then
+	  Cursive.playerState.channeling = nil
+	end
+end)
 Cursive:RegisterEvent("UNIT_CASTEVENT", function(casterGuid, targetGuid, event, spellID, castDuration)
 	-- immolate will fire both start and cast
 	if event == "CAST" then
@@ -97,7 +108,7 @@ Cursive:RegisterEvent("UNIT_CASTEVENT", function(casterGuid, targetGuid, event, 
 			Cursive.playerState.casting = spellName
 		elseif event == "CHANNEL" then
 			Cursive.playerState.channeling = spellName
-		elseif event == "CAST" or event == "CHANNEL" or event == "FAIL" then
+		elseif event == "CAST" or event == "FAIL" then
 			Cursive.playerState.casting = nil
 			Cursive.playerState.channeling = nil
 		end

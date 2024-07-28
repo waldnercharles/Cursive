@@ -69,19 +69,45 @@ function UnitGivesXP(unit)
 		not UnitIsPet(unit)
 end
 
-function UnitHasBuffOrDebuff(unit, spellName, timeRemaining)
+function UnitHasCurse(unit, spellName, timeRemaining)
 	local _, guid = UnitExists(unit)
 	return Cursive.curses:HasCurse(spellName, guid, timeRemaining)
 end
 
+function UnitHasBuffOrDebuff(guid, texture)
+	for i = 1, 16 do
+		local spellName, _, _, _ = UnitDebuff(guid, i)
+		if spellName and texture then
+			if string.find(spellName, texture) then
+				return true
+			end
+		else
+			break
+		end
+	end
+
+	for i = 1, 32 do
+		local spellName, _, _ = UnitBuff(guid, i)
+		if spellName and texture then
+			if string.find(spellName, texture) then
+				return true
+			end
+		else
+			break
+		end
+	end
+
+	return nil
+end
+
 function UnitHasAnyCurse(unit)
-	return UnitHasBuffOrDebuff(unit, "Curse of Agony") or
-		UnitHasBuffOrDebuff(unit, "Curse of Weakness") or
-		UnitHasBuffOrDebuff(unit, "Curse of Tongues") or
-		UnitHasBuffOrDebuff(unit, "Curse of Doom") or
-		UnitHasBuffOrDebuff(unit, "Curse of the Elements") or
-		UnitHasBuffOrDebuff(unit, "Curse of Shadow") or
-		UnitHasBuffOrDebuff(unit, "Curse of Recklessness")
+	return UnitHasCurse(unit, "Curse of Agony") or
+		UnitHasCurse(unit, "Curse of Weakness") or
+		UnitHasCurse(unit, "Curse of Tongues") or
+		UnitHasCurse(unit, "Curse of Doom") or
+		UnitHasCurse(unit, "Curse of the Elements") or
+		UnitHasCurse(unit, "Curse of Shadow") or
+		UnitHasCurse(unit, "Curse of Recklessness")
 end
 
 function UnitIsTargetingParty(unit)
@@ -90,10 +116,6 @@ function UnitIsTargetingParty(unit)
 end
 
 function UnitIsInParty(unit)
-    if IsInInstance() and UnitAffectingCombat(unit) then
-        return true
-    end
-
     if UnitIsUnit("player", unit) or UnitIsUnit("pet", unit) then
         return true
     end
@@ -115,11 +137,11 @@ end
 -------------------------------- SPELL --------------------------------
 
 function IsNightfallActive()
-	return UnitHasBuffOrDebuff("player", "Shadow Trance")
+	return UnitHasBuffOrDebuff("player", "Spell_Shadow_Twilight")
 end
 
 function IsShadowburnActive(unit)
-	return UnitHasBuffOrDebuff(unit, "Shadowburn")
+	return UnitHasBuffOrDebuff(unit, "Spell_shadow_scourgebuild")
 end
 
 -------------------------------- PET --------------------------------
@@ -206,7 +228,7 @@ end
 function VoidwalkerAutoSacrifice(PlayerHealthPercent, PetHealthPercent)
 	local PlayerHP = PlayerHealthPercent or 30
 	local PetHP = PetHealthPercent or 20
-	if UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 or UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasBuffOrDebuff("pet", "Banish") then
+	if UnitCreatureFamily("pet") == "Voidwalker" and UnitHealth("pet") > 0 and (UnitHealth("pet") / UnitHealthMax("pet") <= PetHP / 100 or UnitHealth("player") / UnitHealthMax("player") <= PlayerHP / 100) and not UnitHasCurse("pet", "Banish") then
 		return CastPetSpell("Sacrifice")
 	end
 	return false
@@ -261,7 +283,7 @@ function IsCastingOrChanneling(spell)
 end
 
 function IsAmplifyCurseActive()
-	return UnitHasBuffOrDebuff("player", "Amplify Curse")
+	return UnitHasCurse("player", "Amplify Curse")
 end
 
 function IsOffCooldown(spell, book)
@@ -311,7 +333,7 @@ function Cast(spell, unit, selfCast, refreshTime, stopCast)
 	end
 
 	local action = Cursive_Button[spell]
-	if action and not (IsUsableAction(action) and IsActionInRange(action)) then
+	if action and (selfCast or UnitIsUnit("target", unit)) and not (IsUsableAction(action) and IsActionInRange(action) ~= 0) then
 		return nil
 	end
 
@@ -390,11 +412,11 @@ function CastCurse(unit, curse)
 end
 
 function CastDrainSoul(unit)
-	return not IsMoving() and Cast("Drain Soul", unit)
+	return not IsMoving() and not IsCastingOrChanneling("Drain Soul") and Cast("Drain Soul", unit)
 end
 
 function CastShadowBolt(unit)
-	return not IsMoving() and Cast("Shadow Bolt", unit)
+	return Cast("Shadow Bolt", unit)
 end
 
 function CastShadowburn(unit, stopCast)
@@ -410,7 +432,7 @@ function CastCorruption(unit)
 end
 
 function CastDrainLife(unit)
-	return not IsMoving() and Cast("Drain Life", unit)
+	return not IsMoving() and not IsCastingOrChanneling() and Cast("Drain Life", unit)
 end
 
 function CastSiphonLife(unit)
@@ -444,10 +466,10 @@ function CastAutoTap()
 	local d = IsSpellKnown("Dark Pact")
 	local l = IsSpellKnown("Life Tap")
 
-	if not IsCastingOrChanneling() and not (c and m / mm >= 0.5) then
+	if not IsCastingOrChanneling() and (not c or (m / mm < 0.9)) then
 		if d and mm - m >= 150 and (p == pm or (p / pm >= 0.99 and (h < hm or not l))) and CastDarkPact() then
 			return true
-		elseif (m / mm >= 0.8 and h / hm >= 0.98) or (m / mm < 0.8 and h / hm >= 0.95) and CastLifeTap() then
+		elseif ((m / mm >= 0.8 and h / hm >= 0.98) or (m / mm < 0.8 and h / hm >= 0.9)) and CastLifeTap() then
 			return true
 		end
 	end
@@ -517,6 +539,10 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		return true
 	end
 
+	if not UnitIsUnit("target", unit) and CheckInteractDistance(unit, 4) then
+		TargetUnit(unit)
+	end
+
 	local targetHealthPercent = UnitHealthPercent(unit)
 	local targetIsDying = targetHealthPercent <= 0.2
 	local targetClassification = UnitClassification(unit) or ""
@@ -543,7 +569,7 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		end
 	end
 
-	if not targetIsActive and not IsChanneling() then
+	if not targetIsActive and not IsChanneling() and not IsMoving() then
 		-- TODO: Check immunity
 		if CastImmolate(unit) then
 			return true
@@ -557,13 +583,13 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		return true
 	end
 
-	if (IsCasting("Immolate") and (UnitHasBuffOrDebuff(unit, "Immolate", 2) or targetIsDying)) or (IsCasting("Corruption") and (UnitHasBuffOrDebuff(unit, "Corruption") or targetIsDying)) then
-		SpellStopCasting()
-	end
+	-- if (IsCasting("Immolate") and (UnitHasCurse(unit, "Immolate", 2) or targetIsDying)) or (IsCasting("Corruption") and (UnitHasCurse(unit, "Corruption") or targetIsDying)) then
+	-- 	-- SpellStopCasting()
+	-- end
 
 	-- Main Rotation -- Assumes the player has Nightfall and Fel Concentration
 
-	local isDrainLifeInRange = Cursive_Button["Drain Life"]  and IsActionInRange(Cursive_Button["Drain Life"])
+	local isDrainLifeInRange = UnitIsUnit("target", unit) and Cursive_Button["Drain Life"] and IsActionInRange(Cursive_Button["Drain Life"]) == 1
 
 	local preferDrainLife = targetIsTargetingPlayer and
 		(playerHealthPercent <= 0.8 and playerManaPercent <= 0.2 and isDrainLifeInRange)
@@ -590,7 +616,7 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and (nodrain or not IsSpellKnown("Drain Life") or (not (playerHealthPercent <= 0.8 or isDrainLifeInRange))) and CastImmolate(unit) then
 		return true
 		-- Drain Life
-	elseif not nodrain and (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastDrainLife(unit) then
+	elseif not nodrain and (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and isDrainLifeInRange and CastDrainLife(unit) then
 		return true
 	end
 
@@ -606,11 +632,11 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 end
 
 function UnitIsMulticurseTarget(guid)
-	return UnitExists(guid) and not UnitIsDead(guid) and UnitIsEnemy(guid) and (UnitIsTargetingParty(guid) or Cursive.core.tapped[guid] or UnitIsUnit("target", guid))
+	return UnitExists(guid) and not UnitIsDead(guid) and UnitIsEnemy(guid) and (UnitIsTargetingParty(guid) or Cursive.core.tapped[guid] or GetRaidTargetIndex(guid) or UnitIsUnit("target", guid))
 end
 
-function MulticurseWarlockDotSpam(curse, shards, nodrain)
-	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids) do
+function MulticurseWarlockDotSpam(curse, priority, raidMark, shards, nodrain)
+	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids(priority, raidMark)) do
 		if UnitIsMulticurseTarget(guid) and WarlockDotSpam(guid, curse, shards, nodrain) then
 			TargetUnit(guid)
 			return true
@@ -638,22 +664,21 @@ function IsSquishy(unit)
 	}
 
 	local _, class = UnitClass(unit)
-	return c[class]
+	return (c[class] or -1)
 end
 
 function PetTank()
+	local compareFunc = CompareGuids("HIGHEST_HP", true)
 	local orderFunction = function(guid1, guid2)
 		local guid1Squishy = IsSquishy(guid1.."target")
 		local guid2Squishy = IsSquishy(guid2.."target")
 
 		if guid1Squishy > guid2Squishy then
-			if CompareGuids(guid1, guid2) then
-				return true
-			elseif guid2Squishy > guid1Squishy then
-				return false
-			end
-		else
+			return true
+		elseif guid2Squishy > guid1Squishy then
 			return false
+		else
+			return compareFunc(guid1, guid2)
 		end
 	end
 
