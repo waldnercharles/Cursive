@@ -545,12 +545,9 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 
 	local targetIsEnemyPlayer = UnitIsEnemyPlayer(unit)
 	if targetIsEnemyPlayer then
-		return true
+		return nil
 	end
 
-	if not UnitIsUnit("target", unit) and CheckInteractDistance(unit, 4) then
-		TargetUnit(unit)
-	end
 
 	local targetHealthPercent = UnitHealthPercent(unit)
 	local targetIsDying = targetHealthPercent <= 0.2
@@ -558,7 +555,6 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 	local targetIsBoss = string.find(string.lower(targetClassification), "boss")
 	local targetGivesXp = UnitGivesXP(unit)
 	local targetIsActive = UnitIsActiveEnemy(unit)
-	local targetIsTargetingPlayer = UnitExists(unit .. "target") and UnitIsUnit(unit .. "target", "player")
 
 	local playerHasNightfall = IsNightfallActive()
 	local playerHasAmplifyCurse = IsAmplifyCurseActive()
@@ -573,13 +569,14 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 		if not targetIsBoss and targetIsDying and not IsShadowburnActive(unit) and soulShardCount < soulShardBagSize then
 			CastDrainSoul(unit)
 			return true
-		elseif not IsChanneling() and ((targetIsBoss and targetIsDying) or (not targetIsBoss and targetHealthPercent <= 0.3)) and soulShardCount >= 1 and ((playerHasNightfall and CastShadowBolt(unit)) or CastShadowburn(unit, true)) then
+		end
+		if not IsChanneling() and ((targetIsBoss and targetIsDying) or (not targetIsBoss and targetHealthPercent <= 0.3)) and soulShardCount >= 1 and ((playerHasNightfall and CastShadowBolt(unit)) or CastShadowburn(unit, true)) then
 			return true
 		end
 	end
+	coroutine.yield()
 
 	if not targetIsActive and not IsChanneling() and not IsMoving() then
-		-- TODO: Check immunity
 		if CastImmolate(unit) then
 			return true
 			-- Cast Shadow Bolt if FireImmune
@@ -598,36 +595,50 @@ function WarlockDotSpam(unit, curse, shards, nodrain)
 
 	-- Main Rotation -- Assumes the player has Nightfall and Fel Concentration
 
-	local isDrainLifeInRange = UnitIsUnit("target", unit) and Cursive_Button["Drain Life"] and IsActionInRange(Cursive_Button["Drain Life"]) == 1
-
-	local preferDrainLife = targetIsTargetingPlayer and
-		(playerHealthPercent <= 0.8 and playerManaPercent <= 0.2 and isDrainLifeInRange)
+	
 
 	-- Curse of Recklessness
 	if (targetIsDying and not targetIsBoss) and not UnitExists(unit.."target") and CastCurse(unit, "cor") then
 		return true
+	end
+	coroutine.yield()
 	-- Corruption
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and CastCorruption(unit) then
+	if (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and CastCorruption(unit) then
 		return true
+	end
+	coroutine.yield()
 	-- 	-- DPS Amplify Curse
 	-- elseif (playerHasAmplifyCurse or (not curse and (not targetIsDying or targetIsBoss) and not UnitHasAnyCurse(unit) and not playerIsCastingOrChanneling)) and ((not targetIsDying and targetIsBoss and not playerHasAmplifyCurse and CastCoD(unit)) or CastCoA(unit)) then
 	--  	return true
-		-- Regular Curse
-	elseif (playerHasAmplifyCurse or ((not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not UnitHasAnyCurse(unit))) and CastCurse(unit, curse) then
-		return true
-		-- Siphon Life
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastSiphonLife(unit) then
-		return true
-		-- Life Tap
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastAutoTap() then
-		return true
-		-- Immolate
-	elseif (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and (nodrain or not IsSpellKnown("Drain Life") or (not (playerHealthPercent <= 0.8 or isDrainLifeInRange))) and CastImmolate(unit) then
-		return true
-		-- Drain Life
-	elseif not nodrain and (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and isDrainLifeInRange and CastDrainLife(unit) then
+	-- Curse
+	if (playerHasAmplifyCurse or ((not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not UnitHasAnyCurse(unit))) and CastCurse(unit, curse) then
 		return true
 	end
+	coroutine.yield()
+	-- Siphon Life
+	if (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastSiphonLife(unit) then
+		return true
+	end
+	coroutine.yield()
+	-- Life Tap
+	if (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and CastAutoTap() then
+		return true
+	end
+
+	if not UnitIsUnit("target", unit) and CheckInteractDistance(unit, 4) then
+		TargetUnit(unit)
+	end
+	local isDrainLifeInRange = UnitIsUnit("target", unit) and Cursive_Button["Drain Life"] and IsActionInRange(Cursive_Button["Drain Life"]) == 1
+	-- Immolate
+	if (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and not playerHasAmplifyCurse and (nodrain or not IsSpellKnown("Drain Life") or (not (playerHealthPercent <= 0.8 and isDrainLifeInRange))) and CastImmolate(unit) then
+		return true
+	end
+	coroutine.yield()
+	-- Drain Life
+	if not nodrain and (not targetIsDying or targetIsBoss) and not playerIsCastingOrChanneling and isDrainLifeInRange and CastDrainLife(unit) then
+		return true
+	end
+	coroutine.yield()
 
 	if not playerIsCastingOrChanneling and not targetIsActive then
 		if CastAutoTap() then
@@ -645,12 +656,29 @@ function UnitIsMulticurseTarget(guid)
 end
 
 function MulticurseWarlockDotSpam(curse, priority, raidMark, shards, nodrain)
-	for guid, time in PairsByKeys(Cursive.core.guids, CompareGuids(priority, raidMark)) do
-		if UnitIsMulticurseTarget(guid) and WarlockDotSpam(guid, curse, shards, nodrain) then
-			TargetUnit(guid)
-			return true
+	local co = {}
+	for guid in Cursive.core.guids do
+		if UnitIsMulticurseTarget(guid) then
+			co[guid] = coroutine.create(WarlockDotSpam)
 		end
 	end
+
+	local orderedGuids = PairsByKeys(Cursive.core.guids, CompareGuids(priority, raidMark))
+
+	local alive
+	repeat
+		alive = nil
+		for guid, _ in orderedGuids do
+			if co[guid] and coroutine.status(co[guid]) ~= "dead" then
+				alive = true
+				local _, success = coroutine.resume(co[guid], guid, curse, shards, nodrain)
+				if success then
+					TargetUnit(guid)
+					return true
+				end
+			end
+		end	
+	until not alive
 
 	return nil
 end
