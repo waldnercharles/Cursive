@@ -79,6 +79,8 @@ local function handleSlashCommands(msg, editbox)
 		local spellName, priority, optionsStr = Cursive.utils.strsplit("|", args)
 		local options = parseOptions(optionsStr)
 		Cursive:Multicurse(spellName, priority, options)
+	elseif command == "db" then
+		Cursive.db.profile.immune = {}
 	end
 end
 

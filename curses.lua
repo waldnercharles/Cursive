@@ -16,6 +16,7 @@ local afflict_test = "^(.+) is afflicted by (.+) %((%d+)%)" -- for stacks 2-5 wi
 local gains_test = "^(.+) gains (.+) %((%d+)%)"             -- for stacks 2-5 will be "Fire Vulnerability (2)".
 local fades_test = "(.+) fades from (.+)"
 local resist_test = "Your (.+) was resisted by (.+)"
+local immune_test = "Your (.+) failed. (.*) is immune."
 
 local lastGuid = nil
 
@@ -131,6 +132,31 @@ Cursive:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE",
 				-- check if sound should be played
 				if curses:ShouldPlayResistSound(lastGuid) then
 					PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")
+				end
+			end
+		end
+
+		-- check for immune
+		local _, _, spell, target = string.find(message, immune_test)
+		if spell and target and lastGuid and not UnitPlayerControlled(lastGuid) then
+			if curses.trackedCurseNamesToTextures[spell] and lastGuid and not curses:ScanGuidForCurse(lastGuid, nil, spell) then
+				curses:RemoveCurse(lastGuid, spell)
+				-- check if sound should be played
+				if curses:ShouldPlayResistSound(lastGuid) then
+					PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")
+				end
+			end
+			local isBanished = UnitAffectingCombat(lastGuid) and not UnitExists(lastGuid.."target") -- This is a hack, but, whatever
+			if not isBanished then
+				if not Cursive.db.profile.immune[spell] then
+					Cursive.db.profile.immune[spell] = {}
+				end
+
+				if not Cursive.db.profile.immune[spell][target] then
+					Cursive.db.profile.immune[spell][target] = true
+					print(target.." is immune to "..spell..". Added to database")
+				else
+					print(target.." is immune to "..spell..". Already in database as "..tostring(Cursive.db.profile.immune[spell][target]))
 				end
 			end
 		end

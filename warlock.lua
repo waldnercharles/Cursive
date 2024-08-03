@@ -337,8 +337,17 @@ function Cast(spell, unit, selfCast, refreshTime, stopCast)
 		return nil
 	end
 
+	if not selfCast and UnitIsImmune(unit, spell) then
+		return nil
+	end
+
 	CastSpellByName(spell, unit, selfCast)
 	return true
+end
+
+function UnitIsImmune(unit, spell)
+	local unitName = UnitName(unit)
+	return Cursive.db.profile.immune[spell] and Cursive.db.profile.immune[spell][unitName]
 end
 
 function CastCoE(unit)
@@ -379,14 +388,14 @@ function PickCurse(unit)
 
 	local c = {
 		["WARRIOR"] = "cow",
-		["PALADIN"] = "coa",
+		["PALADIN"] = "cot",
 		["HUNTER"] = "cow",
 		["ROGUE"] = "cow",
 		["PRIEST"] = "cot",
-		["SHAMAN"] = "coa",
+		["SHAMAN"] = "cot",
 		["MAGE"] = "cot",
 		["WARLOCK"] = "cot",
-		["DRUID"] = "cow",
+		["DRUID"] = "cot",
 	}
 	return c[class]
 end

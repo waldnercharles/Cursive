@@ -32,6 +32,8 @@ Cursive:RegisterDefaults("profile", {
 	filterrange = false,
 	filterraidmark = false,
 	filterhascurse = false,
+
+	immune = {}
 })
 
 local barOptions = {
