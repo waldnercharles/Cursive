@@ -33,7 +33,15 @@ Cursive:RegisterDefaults("profile", {
 	filterraidmark = false,
 	filterhascurse = false,
 
-	immune = {}
+	checkImmunity = true,
+	immune = {},
+
+	drainlife = true,
+	siphonlife = true,
+	immolate = true,
+	recklessness = false,
+
+	minHealthPct = 33
 })
 
 local barOptions = {
@@ -240,6 +248,98 @@ local mobFilters = {
 	},
 }
 
+local multicurseSettings = {
+	["drainlife"] = {
+		type = "toggle",
+		name = "Drain Life",
+		order = 10,
+		get = function()
+			return Cursive.db.profile.drainlife
+		end,
+		set = function(v)
+			Cursive.db.profile.drainlife = v
+		end
+	},
+	["siphonlife"] = {
+		type = "toggle",
+		name = "Siphon Life",
+		order = 20,
+		get = function()
+			return Cursive.db.profile.siphonlife
+		end,
+		set = function(v)
+			Cursive.db.profile.siphonlife = v
+		end
+	},
+	["immolate"] = {
+		type = "toggle",
+		name = "Immolate",
+		order = 30,
+		get = function()
+			return Cursive.db.profile.immolate
+		end,
+		set = function(v)
+			Cursive.db.profile.immolate = v
+		end
+	},
+	["recklessness"] = {
+		type = "toggle",
+		name = "Curse of Recklessness",
+		order = 35,
+		get = function()
+			return Cursive.db.profile.recklessness
+		end,
+		set = function(v)
+			Cursive.db.profile.recklessness = v
+		end
+	},
+	["spacer"] = {
+		type = "header",
+		name = " ",
+		order = 40,
+	},
+	["minhealth"] = {
+		type = "range",
+		name = "Min Health Percent",
+		desc = "Do not cast spells on targets below this health percent",
+		order = 45,
+		min = 0,
+		max = 100,
+		step = 1,
+		get = function()
+			return Cursive.db.profile.minHealthPct
+		end,
+		set = function(v)
+			Cursive.db.profile.minHealthPct = v
+		end,
+	},
+	["spacer2"] = {
+		type = "header",
+		name = " ",
+		order = 50,
+	},
+	["checkImmunity"] = {
+		type = "toggle",
+		name = "Immunity DB",
+		order = 60,
+		get = function()
+			return Cursive.db.profile.checkImmunity
+		end,
+		set = function(v)
+			Cursive.db.profile.checkImmunity = v
+		end
+	},
+	["resetImmunity"] = {
+		type = "execute",
+		name = "Reset Immunity DB",
+		order = 70,
+		confirm = true,
+		func = function()
+			Cursive.db.profile.immune = {}
+		end
+	}
+}
+
 Cursive.cmdtable = {
 	type = "group",
 	handler = Cursive,
@@ -328,8 +428,15 @@ Cursive.cmdtable = {
 			type = "group",
 			name = "Mob filters",
 			desc = "Target and Raid Marks always shown",
-			order = 20,
+			order = 19,
 			args = mobFilters
+		},
+		["behavior"] = {
+			type = "group",
+			name = "Multicurse Behavior",
+			desc =  "Multicurse Behavior",
+			order = 20,
+			args = multicurseSettings
 		},
 		["spacer2"] = {
 			type = "header",

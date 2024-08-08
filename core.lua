@@ -25,7 +25,7 @@ Cursive.buffTooltip:SetOwner(Cursive.core, "ANCHOR_NONE")
 Cursive.core.add = function(unit)
 	local _, guid = UnitExists(unit)
 
-	if guid and not UnitIsDead(unit) then
+	if guid and not UnitIsDead(unit) and not UnitPlayerControlled(guid) and UnitIsEnemy(guid) then
 		Cursive.core.guids[guid] = GetTime()
 	end
 end
@@ -35,7 +35,7 @@ Cursive.core.addGuid = function(guid)
 	if string.sub(guid, 1, 2) ~= "0x" then
 		return
 	end
-	if UnitExists(guid) and not UnitIsDead(guid) then
+	if UnitExists(guid) and not UnitIsDead(guid) and not UnitPlayerControlled(guid) and UnitIsEnemy(guid) then
 		Cursive.core.guids[guid] = GetTime()
 	end
 end

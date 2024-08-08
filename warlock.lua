@@ -346,8 +346,10 @@ function Cast(spell, unit, selfCast, refreshTime, stopCast)
 end
 
 function UnitIsImmune(unit, spell)
-	local unitName = UnitName(unit)
-	return Cursive.db.profile.immune[spell] and Cursive.db.profile.immune[spell][unitName]
+	if Cursive.db.profile.checkImmunity then
+		local unitName = UnitName(unit)
+		return Cursive.db.profile.immune[spell] and Cursive.db.profile.immune[spell][unitName]
+	end
 end
 
 function CastCoE(unit)
@@ -382,9 +384,9 @@ function CastCoA(unit)
 	return Cast( "Curse of Agony", unit)
 end
 
-function PickCurse(unit)
-	unit = unit or "target"
-	local _, class = UnitClass(unit)
+function PickCurse(guid)
+	guid = guid or "target"
+	local _, class = UnitClass(guid)
 
 	local c = {
 		["WARRIOR"] = "cow",
@@ -401,7 +403,7 @@ function PickCurse(unit)
 end
 
 function CastCurse(unit, curse)
-	curse = curse or PickCurse(unit)
+	curse = curse or PickCurse(unit.guid)
 
 	local curseName =
 		((curse == "coe" or curse == "e") and "Curse of Exhaustion") or
@@ -417,7 +419,10 @@ function CastCurse(unit, curse)
 		curseName = "Curse of Agony"
 	end
 
-	return Cast(curseName, unit)
+	if curseName ~= "Curse of Agony" or unit.shouldDamage then
+		return Cast(curseName, unit.guid)
+	end
+
 end
 
 function CastDrainSoul(unit)
@@ -525,7 +530,7 @@ end
 -------------------------------- MAIN --------------------------------
 
 function WarlockDotSpam_UnitGivesXp(unit, player)
-	if unit.giveXp then
+	if unit.givesXp and unit.isTapped then
 		local soulShardCount = GetSoulShardCount() or 0
 		local soulShardBagSize = 4
 		if not unit.isBoss and unit.isDying and not IsShadowburnActive(unit.guid) and soulShardCount < soulShardBagSize then
@@ -550,31 +555,31 @@ function WarlockDotSpam_UnitInactive(unit, player)
 end
 
 function WarlockDotSpam_Nightfall(unit, player)
-	if not player.hasAmplifyCurse and player.hasNightfall and CastShadowBolt(unit.guid) then
+	if unit.shouldDamage and not player.hasAmplifyCurse and player.hasNightfall and CastShadowBolt(unit.guid) then
 		return true
 	end
 end
 
 function WarlockDotSpam_CurseOfRecklessness(unit, player)
-	if unit.isFleeing and CastCurse(unit.guid, "cor") then
+	if player.recklessness and unit.isFleeing and CastCurse(unit, "cor") then
 		return true
 	end
 end
 
 function WarlockDotSpam_Corruption(unit, player)
-	if (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and not player.hasAmplifyCurse and CastCorruption(unit.guid) then
+	if unit.shouldDamage and (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and not player.hasAmplifyCurse and CastCorruption(unit.guid) then
 		return true
 	end
 end
 
 function WarlockDotSpam_Curse(unit, player)
-	if (player.hasAmplifyCurse or ((not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and not UnitHasAnyCurse(unit.guid))) and CastCurse(unit.guid, player.curse) then
+	if (player.hasAmplifyCurse or ((not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and not UnitHasAnyCurse(unit.guid))) and CastCurse(unit, player.curse) then
 		return true
 	end
 end
 
 function WarlockDotSpam_SiphonLife(unit, player)
-	if (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and CastSiphonLife(unit.guid) then
+	if unit.shouldDamage and player.siphonlife and (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and CastSiphonLife(unit.guid) then
 		return true
 	end
 end
@@ -586,7 +591,7 @@ function WarlockDotSpam_LifeTap(unit, player)
 end
 
 function WarlockDotSpam_Immolate(unit, player)
-	if (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and CastImmolate(unit.guid) then
+	if player.immolate and (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and CastImmolate(unit.guid) then
 		return true
 	end
 end
@@ -596,7 +601,7 @@ function WarlockDotSpam_DrainLife(unit, player)
 		TargetUnit(unit.guid)
 	end
 	local isDrainLifeInRange = UnitIsUnit("target", unit.guid) and Cursive_Button["Drain Life"] and IsActionInRange(Cursive_Button["Drain Life"]) == 1
-	if not player.nodrain and (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and isDrainLifeInRange and CastDrainLife(unit.guid) then
+	if player.drainlife and (not unit.isDying or unit.isBoss) and not player.isCastingOrChanneling and isDrainLifeInRange and CastDrainLife(unit.guid) then
 		return true
 	end
 end
@@ -605,23 +610,20 @@ function UnitIsMulticurseTarget(guid)
 	return UnitExists(guid) and not UnitIsDead(guid) and not UnitPlayerControlled(guid) and UnitIsEnemy(guid) and (UnitIsTargetingParty(guid) or Cursive.core.tapped[guid] or GetRaidTargetIndex(guid) or UnitIsUnit("target", guid))
 end
 
-function MulticurseWarlockDotSpam(curse, priority, raidMark, shards, nodrain)
-	local funcs = {
-		WarlockDotSpam_UnitGivesXp,
-		WarlockDotSpam_UnitInactive,
-		WarlockDotSpam_Nightfall,
-		WarlockDotSpam_CurseOfRecklessness,
-		WarlockDotSpam_Corruption,
-		WarlockDotSpam_Curse,
-		WarlockDotSpam_SiphonLife,
-		WarlockDotSpam_LifeTap,
-		WarlockDotSpam_Immolate,
-		WarlockDotSpam_DrainLife
-	}
+WarlockDotSpamFuncs = {
+	WarlockDotSpam_UnitGivesXp,
+	WarlockDotSpam_UnitInactive,
+	WarlockDotSpam_Nightfall,
+	WarlockDotSpam_CurseOfRecklessness,
+	WarlockDotSpam_Corruption,
+	WarlockDotSpam_Curse,
+	WarlockDotSpam_SiphonLife,
+	WarlockDotSpam_LifeTap,
+	WarlockDotSpam_Immolate,
+	WarlockDotSpam_DrainLife
+}
 
-	if curse == 0 then
-		curse = nil
-	end
+function MulticurseWarlockDotSpam(curse, priority, ignoreRaidMark, shards)
 	if shards == 0 then
 		shards = nil
 	end
@@ -644,17 +646,17 @@ function MulticurseWarlockDotSpam(curse, priority, raidMark, shards, nodrain)
 	player.healthPercent = UnitHealthPercent("player")
 	player.manaPercent = UnitManaPercent("player")
 	player.curse = curse
-	player.nodrain = nodrain
+	player.drainlife = Cursive.db.profile.drainlife
+	player.siphonlife = Cursive.db.profile.siphonlife
+	player.immolate = Cursive.db.profile.immolate
+	player.recklessness = Cursive.db.profile.recklessness
+	player.checkImmunity = Cursive.db.profile.checkImmunity
 
 	local unit = {}
 
 	for guid in Cursive.core.guids do
-		guid = guid or "target"
-		_, guid = UnitExists(guid)
-
 		if guid and UnitIsMulticurseTarget(guid) then
 			local u = {}
-
 			u.guid = guid
 			u.isEnemyPlayer = UnitIsEnemyPlayer(guid)
 			u.healthPercent = UnitHealthPercent(guid)
@@ -665,18 +667,17 @@ function MulticurseWarlockDotSpam(curse, priority, raidMark, shards, nodrain)
 			u.isActive = UnitIsActiveEnemy(guid)
 			u.hasTarget = UnitExists(guid.."target")
 			u.isFleeing = u.isDying and not u.isBoss and not u.hasTarget
+			u.isTapped = Cursive.core.tapped[guid]
+			u.shouldDamage = u.healthPercent > (Cursive.db.profile.minHealthPct / 100.0)
 
 			unit[guid] = u
 		end
 	end
 
-	local orderedGuids = PairsByKeys(Cursive.core.guids, CompareGuids(priority, raidMark))
-
-	for f in funcs do
-		for guid, _ in orderedGuids do
-			local u = unit[guid]
+	for _, f in WarlockDotSpamFuncs do
+		for guid, u in PairsByKeys(unit, CompareGuids(priority, not ignoreRaidMark)) do
 			if u and not u.isEnemyPlayer and f(u, player) then
-				TargetUnit(guid)
+				-- TargetUnit(guid)
 				return true
 			end
 		end

@@ -146,17 +146,19 @@ Cursive:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE",
 					PlaySoundFile("Interface\\AddOns\\Cursive\\Sounds\\resist.mp3")
 				end
 			end
-			local isBanished = UnitAffectingCombat(lastGuid) and not UnitExists(lastGuid.."target") -- This is a hack, but, whatever
-			if not isBanished then
-				if not Cursive.db.profile.immune[spell] then
-					Cursive.db.profile.immune[spell] = {}
-				end
+			if Cursive.db.profile.checkImmunity then
+				local isBanished = UnitAffectingCombat(lastGuid) and not UnitExists(lastGuid.."target") -- This is a hack, but, whatever
+				if not isBanished then
+					if not Cursive.db.profile.immune[spell] then
+						Cursive.db.profile.immune[spell] = {}
+					end
 
-				if not Cursive.db.profile.immune[spell][target] then
-					Cursive.db.profile.immune[spell][target] = true
-					print(target.." is immune to "..spell..". Added to database")
-				else
-					print(target.." is immune to "..spell..". Already in database as "..tostring(Cursive.db.profile.immune[spell][target]))
+					if not Cursive.db.profile.immune[spell][target] then
+						Cursive.db.profile.immune[spell][target] = true
+						print(target.." is immune to "..spell..". Added to database")
+					else
+						print(target.." is immune to "..spell..". Already in database as "..tostring(Cursive.db.profile.immune[spell][target]))
+					end
 				end
 			end
 		end
